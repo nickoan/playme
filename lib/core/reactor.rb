@@ -1,5 +1,4 @@
 require 'rb_thread_pool'
-require 'puma'
 require 'socket'
 
 require 'core/client'
