@@ -127,6 +127,8 @@ module PlayMe
       op_time = writing.size
       current_time = Time.now.to_i
 
+      need_compact = false
+
       op_time.times do |idx|
         client = writing[idx]
         state = catch :checked do
@@ -137,6 +139,7 @@ module PlayMe
           when :timed_out, :ready_close then
             client.close
             writing[idx] = nil
+            need_compact = true unless need_compact
           when :need_alive then
             raise Exception, 'cannot set alive in writing state'
           when :not_finish then
@@ -145,7 +148,7 @@ module PlayMe
             raise Exception, 'unknown state at op_response_client'
         end
       end
-      writing.compact!
+      writing.compact! if need_compact
     end
 
 
