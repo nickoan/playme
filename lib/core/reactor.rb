@@ -26,11 +26,11 @@ module PlayMe
     def initialize(app, config = {})
 
       @configure = config.dup
-      @working_thread_pool = RBThreadPool::Base.new
+      @working_thread_pool = RBThreadPool::Base.new(config)
 
       @register_queue = Queue.new # store regist io
       @response_queue = Queue.new # store response io
-      @alive_pool = [] # only reactor allow operate in this array
+
       @register_limit = 200
       @operate_count = 100 # how many times reactor operate in one section
 
@@ -38,8 +38,7 @@ module PlayMe
 
       @writing = []
 
-      @alive_pool = []
-
+      @alive_pool = [] # only reactor allow operate in this array
       @alive_limit = 1000
       @status = true
 
