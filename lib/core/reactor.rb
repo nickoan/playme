@@ -9,7 +9,22 @@ module PlayMe
   end
 
   class Reactor
-    def initialize(app, config={})
+
+    attr_reader :pending, :writing, :alive_pool
+
+    attr_accessor :status, :app, :playme_blk
+
+    # in process, a lot of function and code logic are not added in
+
+    # my plan is try not using mutex, most non block operation will run in reactor
+    # some other will using ruby queue and put proc into queue, let them run in thread pool
+
+
+    # app is a custom class or proc that able to call, just like rack apps
+    # config is the configure for this server, currently not add in anythings yet
+    def initialize(app, config = {})
+
+      @configure = config.dup
       @working_thread_pool = RBThreadPool::Base.new
 
       @register_queue = Queue.new # store regist io
@@ -22,6 +37,8 @@ module PlayMe
 
       @writing = []
 
+      @alive_pool = []
+
       @alive_limit = 1000
       @status = true
 
@@ -32,6 +49,8 @@ module PlayMe
         # done with client actions
         @response_queue.push(client)
       end
+
+      @reactor_thread = nil
     end
 
     def regist(io)
@@ -76,12 +95,20 @@ module PlayMe
       current_time = Time.now.to_i
       op.times do
         client = responses.pop
-
-        if client.timed_out?(current_time) or client.ready_to_close?
-          client.close
-          next
+        state = catch :checked do
+          checking_client_state(client, current_time)
         end
-        @writing << client
+
+        case state
+          when :timed_out, :ready_close then
+            client.close
+          when :need_alive then
+            @alive_pool << client
+          when :not_finish then
+            @writing << client
+          else
+            raise Exception, 'unknown state at op_response_client'
+        end
       end
     end
 
@@ -90,11 +117,23 @@ module PlayMe
       return if writing.empty?
       op_time = writing.size
       current_time = Time.now.to_i
+
       op_time.times do |idx|
         client = writing[idx]
-        if client.timed_out?(current_time) or client.ready_to_close?
-          client.close
-          writing[idx] = nil
+        state = catch :checked do
+          checking_client_state(client, current_time)
+        end
+
+        case state
+          when :timed_out, :ready_close then
+            client.close
+            writing[idx] = nil
+          when :need_alive then
+            raise Exception, 'cannot set alive in writing state'
+          when :not_finish then
+            next
+          else
+            raise Exception, 'unknown state at op_response_client'
         end
       end
       writing.compact!
@@ -147,6 +186,20 @@ module PlayMe
 
     def dispatch_to_thread(&blk)
       @working_thread_pool.add(&blk)
+    end
+
+
+    def checking_client_state(client, current_time = Time.now.to_i)
+      if client.timed_out?(current_time)
+        throw :checked, :timed_out
+      elsif client.ready_to_close?
+        # checking if need keep tcp connection
+        if client.need_alive?
+          throw :checked, :need_alive
+        end
+        throw :checked, :ready_close
+      end
+      :not_finish
     end
 
   end

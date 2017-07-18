@@ -13,16 +13,16 @@ module PlayMe
     def initialize(io)
       @client_io = io
       @to_io = io.to_io
-      @req_data = nil
+      @buffer = nil
       @request = nil
       @response = ''
       @time_out_at = Time.now.to_i + 30
-      @alive = false
+      @need_alive = false
     end
 
     def ready_to_operate?
       if try_finishing?
-        @request = StringIO.new(@data)
+        @request = StringIO.new(@buffer)
         return true
       end
       false
@@ -36,13 +36,13 @@ module PlayMe
       @client_io.close
     end
 
-    def alive?
-      return @alive
+    def need_alive?
+      return @need_alive
     end
 
-    def alive=(status = true)
+    def need_alive=(status = true)
       raise TypeError, 'alive must be a boolean' unless status.is_a?(TrueClass)
-      @alive = status
+      @need_alive = status
     end
 
     def body=(str)
@@ -68,10 +68,10 @@ module PlayMe
     def try_finishing?
       begin
         data = @client_io.read_nonblock(CHUNK_SIZE)
-        if @req_data
-          @req_data << data
+        if @buffer
+          @buffer << data
         else
-          @req_data = data
+          @buffer = data
         end
       rescue IO::WaitReadable
         return false
