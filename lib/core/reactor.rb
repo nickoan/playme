@@ -17,7 +17,11 @@ module PlayMe
       @alive_pool = [] # only reactor allow operate in this array
       @register_limit = 200
       @operate_count = 100 # how many times reactor operate in one section
+
       @pending = []
+
+      @writing = []
+
       @alive_limit = 1000
       @status = true
 
@@ -57,7 +61,11 @@ module PlayMe
         # otherwise will put in pending pool arr
         op_regist_io(@operate_count)
 
+        # checking writing client io finish yet?
+        op_writing_client(@writing)
 
+        # get response from response pool, try writing them, if not finish put in writing arr
+        op_response_client(@operate_count)
 
       end
     end
@@ -65,13 +73,31 @@ module PlayMe
 
     def op_response_client(op)
       responses = @response_queue.pop
+      current_time = Time.now.to_i
       op.times do
         client = responses.pop
-        next unless client.ready_to_close?
-        client.close
 
-        # stub not finish yet <----
+        if client.timed_out?(current_time) or client.ready_to_close?
+          client.close
+          next
+        end
+        @writing << client
       end
+    end
+
+
+    def op_writing_client(writing)
+      return if writing.empty?
+      op_time = writing.size
+      current_time = Time.now.to_i
+      op_time.times do |idx|
+        client = writing[idx]
+        if client.timed_out?(current_time) or client.ready_to_close?
+          client.close
+          writing[idx] = nil
+        end
+      end
+      writing.compact!
     end
 
 
@@ -81,6 +107,8 @@ module PlayMe
         break unless dispatch_io(io)
       end
     end
+
+
 
     def op_pending_client(pendings)
       return if pendings.empty?
@@ -94,9 +122,13 @@ module PlayMe
       pendings.compact! # remove nil in pending arr
     end
 
+
+
     def op_set_pending_client(client)
       @pending << client
     end
+
+
 
     def dispatch_io(io)
       return false if io.nil?
@@ -110,6 +142,8 @@ module PlayMe
       end
       true
     end
+
+
 
     def dispatch_to_thread(&blk)
       @working_thread_pool.add(&blk)

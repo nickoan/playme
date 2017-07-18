@@ -15,7 +15,7 @@ module PlayMe
       @to_io = io.to_io
       @req_data = nil
       @request = nil
-      @response = nil
+      @response = ''
       @time_out_at = Time.now.to_i + 30
       @alive = false
     end
@@ -29,8 +29,7 @@ module PlayMe
     end
 
     def ready_to_close?
-      return true if try_write?
-      false
+      try_write?
     end
 
     def close
@@ -59,14 +58,23 @@ module PlayMe
       @to_io
     end
 
-
+    # def ready?
+    #   read = IO.select([self])
+    #   return true if read and read[0]
+    # end
 
     private
 
     def try_finishing?
       begin
         data = @client_io.read_nonblock(CHUNK_SIZE)
-        set_in_data data
+        if @req_data
+          @req_data << data
+        else
+          @req_data = data
+        end
+      rescue IO::WaitReadable
+        return false
       rescue Errno::EAGAIN
         return false
       rescue SystemCallError, IOError
@@ -79,18 +87,14 @@ module PlayMe
 
     def try_write?
       begin
-        @client_io.write_nonblock(@response)
-        return true
+        byte = @client_io.write_nonblock(@response)
+        @response = @response.slice!(0, byte)
+        return true if @response.empty?
+        return false
+      rescue IO::WaitWritable
+        return false
       rescue SystemCallError, IOError
         raise ClientReadingError, 'Connection error detected during write'
-      end
-    end
-
-    def set_in_data(data)
-      if @req_data
-        @req_data << data
-      else
-        @req_data = data
       end
     end
 
