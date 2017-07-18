@@ -10,7 +10,7 @@ module PlayMe
 
   class Reactor
 
-    attr_reader :pending, :writing, :alive_pool
+    attr_reader :pending, :writing, :alive_pool, :reactor_running
 
     attr_accessor :status, :app, :playme_blk
 
@@ -22,6 +22,7 @@ module PlayMe
 
     # app is a custom class or proc that able to call, just like rack apps
     # config is the configure for this server, currently not add in anythings yet
+
     def initialize(app, config = {})
 
       @configure = config.dup
@@ -51,6 +52,7 @@ module PlayMe
       end
 
       @reactor_thread = nil
+      @reactor_running = false
     end
 
     def regist(io)
@@ -58,12 +60,20 @@ module PlayMe
       @register_queue.push(io)
     end
 
-    # def done_action(client)
-    #   @response_queue.push(client)
-    # end
 
+
+    # Reactor start here
     def run!
+      return false if @reactor_running
+      @reactor_running = true
       # reactor running
+      @reactor_thread = Thread.fork do
+        th_current = Thread.current
+        th_current.name = "PlayMe:Reactor #{Thread.current.to_s}" if Thread.respond_to?(:name=)
+        th_current.current.priority = 3 # always run reactor first
+        th_current.current.abort_on_exception = true
+        reactor_run!
+      end
     end
 
     private
