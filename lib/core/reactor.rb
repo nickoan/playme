@@ -1,6 +1,6 @@
 require 'rb_thread_pool'
 require 'socket'
-
+require 'puma'
 require 'core/client'
 
 module PlayMe
@@ -159,6 +159,11 @@ module PlayMe
       end
     end
 
+
+    def op_alive_pool(pool)
+      size = pool.size
+
+    end
 
 
     def op_pending_client(pendings)

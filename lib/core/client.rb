@@ -1,3 +1,4 @@
+require 'stringio'
 
 
 module PlayMe
@@ -14,18 +15,14 @@ module PlayMe
       @client_io = io
       @to_io = io.to_io
       @buffer = nil
-      @request = nil
-      @response = ''
+      @requests = Queue.new
+      @response = Queue.new
       @time_out_at = Time.now.to_i + 30
       @need_alive = false
     end
 
     def ready_to_operate?
-      if try_finishing?
-        @request = StringIO.new(@buffer)
-        return true
-      end
-      false
+      try_finishing?
     end
 
     def ready_to_close?
@@ -45,7 +42,7 @@ module PlayMe
       @need_alive = status
     end
 
-    def body=(str)
+    def response=(str)
       @response = str
     end
 
@@ -67,12 +64,7 @@ module PlayMe
 
     def try_finishing?
       begin
-        data = @client_io.read_nonblock(CHUNK_SIZE)
-        if @buffer
-          @buffer << data
-        else
-          @buffer = data
-        end
+        read_buffer_from_io
       rescue IO::WaitReadable
         return false
       rescue Errno::EAGAIN
@@ -80,6 +72,8 @@ module PlayMe
       rescue SystemCallError, IOError
         raise ClientReadingError, 'Connection error detected during read'
       rescue EOFError
+        @requests << StringIO.new(@buffer).string
+        @buffer = nil
         return true
       end
       false
@@ -95,6 +89,15 @@ module PlayMe
         return false
       rescue SystemCallError, IOError
         raise ClientReadingError, 'Connection error detected during write'
+      end
+    end
+
+    def read_buffer_from_io
+      data = @client_io.read_nonblock(CHUNK_SIZE)
+      if @buffer
+        @buffer << data
+      else
+        @buffer = data
       end
     end
 
