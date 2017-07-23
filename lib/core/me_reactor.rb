@@ -23,6 +23,14 @@ module PlayMe
       @thread_pool = RBThreadPool::Base.new(config)
 
       @condition = true
+
+      @reactor_th = nil
+    end
+
+    def run!
+      @reactor_th = Thread.fork do
+        reactor_running_in_thread!
+      end
     end
 
     private
@@ -35,12 +43,23 @@ module PlayMe
 
         op_register_to_pending(100)
 
+        op_writing_response
+
         op_response_to_write(100)
       end
     end
 
     def op_writing_response
-      # in process
+      return if @writing.empty?
+      size = @writing.size
+      size.times do |idx|
+        next unless client = @writing[idx].write_response
+        if client.alive?
+          @alive_tcps << client
+        end
+        @writing[idx] = nil
+      end
+      @writing.compact!
     end
 
     def op_response_to_write(num)
