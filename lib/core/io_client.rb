@@ -4,7 +4,7 @@ module PlayMe
 
     def initialize(io)
       @ori_io = io
-      @to_io = io
+      @to_io = io.to_io
       @timeout = Time.now.to_i + 30
       @requests = Queue.new
       @responses = Queue.new
