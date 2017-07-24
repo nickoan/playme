@@ -21,8 +21,8 @@ module PlayMe
         read_from_io
       rescue IO::WaitReadable
         return false
-      rescue SystemCallError, IOError
-        raise ClientReadingError, 'Connection error detected during read'
+      rescue SystemCallError, IOError => error
+        throw :client_error, [self, error]
       rescue EOFError
         @requests << StringIO.new(@current_buffer).string
         @current_buffer = nil
@@ -41,8 +41,9 @@ module PlayMe
         write_one_response
       rescue IO::WaitWritable
         return false
-      rescue SystemCallError, IOError
-        raise ClientWritingError, 'Connection error detected during write'
+      rescue SystemCallError, IOError => error
+        throw :client_error, [self, error.message]
+        #raise ClientWritingError, 'Connection error detected during write'
       end
       true
     end
@@ -65,6 +66,10 @@ module PlayMe
     end
     alias need_alive? alive?
 
+
+    def timeout?(time = Time.now.to_i)
+      @timeout > time
+    end
 
     private
 

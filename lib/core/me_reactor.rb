@@ -7,6 +7,7 @@ module PlayMe
     def initialize(app, config = {})
       @app = app
       @config = config.dup
+      @log = config[:logger]
 
       @accepts = 100 || @config[:accepts]
       @alives = 1000 || @config[:alives]
@@ -17,6 +18,8 @@ module PlayMe
       @mutex = Mutex.new
       @pending = []
       @writing = []
+
+      @garbage = []
       @alive_tcps = []
 
       config[:limit] = 1000 || config[:limit]
@@ -29,6 +32,8 @@ module PlayMe
 
     def run!
       @reactor_th = Thread.fork do
+        Thread.current.abort_on_exception = true
+        Thread.current.name = "PlayMe:Reactor #{Thread.current.to_s}" if Thread.respond_to?(:name=)
         reactor_running_in_thread!
       end
     end
@@ -37,7 +42,6 @@ module PlayMe
 
     def reactor_running_in_thread!
       while @condition
-
         # check pending array, move it to thread pool to process.
         op_pending_to_th_pool
 
@@ -46,21 +50,62 @@ module PlayMe
         op_writing_response
 
         op_response_to_write(100)
+
+        op_trash_garbage
       end
     end
 
+
+    def check_timeout(client)
+      if client.timeout?
+        @garbage << client
+        return true
+      end
+      false
+    end
+
+
+    def op_trash_garbage
+      return if @garbage.empty?
+      @garbage.each(&:close)
+      @garbage = []
+    end
+
+
     def op_writing_response
+
       return if @writing.empty?
+
       size = @writing.size
+
       size.times do |idx|
-        next unless client = @writing[idx].write_response
-        if client.alive?
-          @alive_tcps << client
+
+        client = @writing[idx]
+        client_cpy = nil
+        error = nil
+
+        unless check_timeout(client)
+          client_cpy, error = catch(:client_error) do
+            next unless client.write_response
+            if client.alive?
+              @alive_tcps << client
+            end
+            [nil, nil]
+          end
         end
+
+        unless error.nil?
+          @log.error("client_io_error: #{error.message},backtrace: #{error.backtrace}") unless @log.nil?
+          @garbage << client_cpy
+        end
+
         @writing[idx] = nil
       end
+
       @writing.compact!
     end
+
+
 
     def op_response_to_write(num)
       num.times do
