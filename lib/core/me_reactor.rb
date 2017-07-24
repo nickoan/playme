@@ -137,11 +137,21 @@ module PlayMe
     end
 
     def move_response_out_queue
+      client_cpy = nil
+      error = nil
       if client = @responses.pop(true)
-        @writing << client unless client.write_response
+        client_cpy,error = catch :client_error do
+          @writing << client unless client.write_response
+        end
       end
-      return client.close unless client.alive?
-      @alive_tcps << client
+
+      if error.nil?
+        return client.close unless client.alive?
+        @alive_tcps << client
+      else
+        @log.error("client_io_error: #{error.message},backtrace: #{error.backtrace}") unless @log.nil?
+        @garbage << client_cpy
+      end
     end
 
     def put_request_in_pool(client)
