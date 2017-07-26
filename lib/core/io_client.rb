@@ -1,4 +1,6 @@
 
+require 'core/http_parser'
+
 module PlayMe
   class IoClient
 
@@ -10,8 +12,8 @@ module PlayMe
       @responses = Queue.new
       @need_alive = false
 
-      @response_buffer = nil
-      @has_response_buffer = false
+      # @response_buffer = nil
+      # @has_response_buffer = false
 
       @current_buffer = nil
     end
@@ -20,6 +22,10 @@ module PlayMe
       begin
         read_from_io
       rescue IO::WaitReadable
+        if @current_buffer
+          @requests << StringIO.new(@current_buffer).string
+          return true
+        end
         return false
       rescue SystemCallError, IOError => error
         throw :client_error, [self, error]
@@ -32,13 +38,14 @@ module PlayMe
     end
 
     def try_get_request
-      @requests.pop(true)
+      return nil if @requests.empty?
+      return @requests.pop(true)
     end
 
 
-    def write_response
+    def write_response(data)
       begin
-        write_one_response
+        write_one_response(data)
       rescue IO::WaitWritable
         return false
       rescue SystemCallError, IOError => error
@@ -53,9 +60,9 @@ module PlayMe
     end
     alias close close!
 
-    def response=(data)
-      @responses << data
-    end
+    # def response=(data)
+    #   @responses << data
+    # end
 
     def alive=(bool)
       @need_alive = bool
@@ -82,16 +89,18 @@ module PlayMe
       end
     end
 
-    def write_one_response
-      if @has_response_buffer
-        data = @response_buffer
-      else
-        data = @responses.pop(true)
-        return if data.nil?
-      end
-      left = @ori_io.write_nonblock(data)
-      @response_buffer = data.slice!(0, left)
-      @has_response_buffer = false if @has_response_buffer and @response_buffer.empty?
+    def write_one_response(data)
+      @ori_io.write(data)
+      # if @has_response_buffer
+      #   data = @response_buffer
+      # else
+      #   return if @responses.empty?
+      #   data = @responses.pop(true)
+      #   return if data.nil?
+      # end
+      # left = @ori_io.write_nonblock(data)
+      # @response_buffer = data.slice!(0, left)
+      # @has_response_buffer = false if @has_response_buffer and @response_buffer.empty?
     end
 
   end
