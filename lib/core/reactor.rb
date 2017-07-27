@@ -25,6 +25,8 @@ module PlayMe
       # when all queue and array empty it will turn false
       # which mean will block reactor
       @condition = true
+
+      @clients = 0
     end
 
 
@@ -41,6 +43,7 @@ module PlayMe
 
     def regist(io)
       @register.push ::PlayMe::Client.new(io)
+      signal_add_client
     end
 
     private
@@ -49,8 +52,7 @@ module PlayMe
     def reactor_run_in_th
       while true
 
-        @condition = false if @living.empty? && @pending.empty? && @writing.empty? &&
-            @register.empty? && @responses.empty?
+        @condition = false if @clients.zero?
 
         op_register_client
 
@@ -71,7 +73,7 @@ module PlayMe
       @living.size.times do |idx|
         client = @living[idx]
         if client.timeout?
-          client.close
+          close_client client
           @living[idx] = nil
           next
         end
@@ -92,7 +94,7 @@ module PlayMe
         client = @writing[idx]
 
         if client.timeout?
-          client.close
+          close_client client
           @writing[idx] = nil
           next
         end
@@ -113,7 +115,7 @@ module PlayMe
           return
         end
         err = catch :error_closed do
-          client.close
+          close_client client
           return
         end
         p err.message unless err.nil?
@@ -130,7 +132,7 @@ module PlayMe
         client = @pending[idx]
 
         if client.timeout?
-          client.close
+          close_client client
           @pending[idx] = nil
           next
         end
@@ -148,11 +150,24 @@ module PlayMe
       return if @register.empty? && @condition
       client = @register.pop(@condition)
       # reset pop to be non block
-      @condition = true
       return run_in_pool(client) if client.try_read
       @pending << client
     end
 
+    def signal_add_client
+      @condition = true unless @condition
+      @clients += 1
+    end
+
+    def signal_min_client
+      return if @clients.zero?
+      @clients -= 1
+    end
+
+    def close_client(client)
+      client.close
+      signal_min_client
+    end
 
     def run_in_pool(client)
       request = client.request
