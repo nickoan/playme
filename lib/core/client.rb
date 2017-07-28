@@ -80,7 +80,7 @@ module PlayMe
       begin
         response = @responses.shift
         left = @io.write_nonblock(response)
-        return true if left == response.size
+        return true if left == response.bytes.size
         @responses.unshift response.slice!(0, left)
         return false
       rescue IO::WaitWritable
