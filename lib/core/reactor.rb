@@ -1,6 +1,7 @@
 require 'rb_thread_pool'
 require 'core/http_parser'
 require 'core/client'
+require 'benchmark'
 
 module PlayMe
   class Reactor
@@ -24,7 +25,7 @@ module PlayMe
 
       # when all queue and array empty it will turn false
       # which mean will block reactor
-      @condition = true
+      @condition = false
 
       @clients = 0
     end
@@ -34,6 +35,7 @@ module PlayMe
       @reactor = Thread.new do
         Thread.abort_on_exception = true
         Thread.current.name = "PlayMe:Reactor #{Thread.current.to_s}" if Thread.respond_to?(:name=)
+        #Thread.current.priority = 4
         # stub hold
         @thread_pool.start!
         reactor_run_in_th
@@ -43,7 +45,6 @@ module PlayMe
 
     def regist(io)
       @register.push ::PlayMe::Client.new(io)
-      signal_add_client
     end
 
     private
@@ -51,17 +52,14 @@ module PlayMe
 
     def reactor_run_in_th
       while true
-
-        @condition = false if @clients.zero?
-
         op_register_client
-
+        #
         op_pending_client
-
+        #
         op_living_client
-
+        #
         op_writing_client
-
+        #
         op_response_client
       end
     end
@@ -147,21 +145,25 @@ module PlayMe
     end
 
     def op_register_client
-      return if @register.empty? && @condition
+      return if @register.empty? and @condition
       client = @register.pop(@condition)
+      @condition = true unless @conditiong
+      signal_add_client
       # reset pop to be non block
       return run_in_pool(client) if client.try_read
       @pending << client
     end
 
     def signal_add_client
-      @condition = true unless @condition
       @clients += 1
     end
 
     def signal_min_client
-      return if @clients.zero?
       @clients -= 1
+      if @clients.zero?
+        @condition = false
+        return
+      end
     end
 
     def close_client(client)
@@ -171,13 +173,13 @@ module PlayMe
 
     def run_in_pool(client)
       request = client.request
-      @thread_pool.add do
-        env = @parser.execute request
-        response, alive = @app.call(env)
-        client << response
-        client.alive = true if alive
-        @responses.push client
-      end
+      #env = nil
+      #puts Benchmark.measure { env = @parser.execute request }
+      env = @parser.execute request
+      response, alive = @app.call(env, @thread_pool)
+      client << response
+      client.alive = true if alive
+      @responses.push client
     end
 
   end
