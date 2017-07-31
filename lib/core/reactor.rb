@@ -35,8 +35,6 @@ module PlayMe
       @reactor = Thread.new do
         Thread.abort_on_exception = true
         Thread.current.name = "PlayMe:Reactor #{Thread.current.to_s}" if Thread.respond_to?(:name=)
-        #Thread.current.priority = 4
-        # stub hold
         @thread_pool.start!
         reactor_run_in_th
       end
@@ -173,11 +171,11 @@ module PlayMe
 
     def run_in_pool(client)
       request = client.request
-      #env = nil
-      #puts Benchmark.measure { env = @parser.execute request }
       env = @parser.execute request
-      response, alive = @app.call(env, @thread_pool)
-      client << response
+      $stdout.write "#{env['Method']} #{client.ip}[#{Time.now.to_s}]: #{env['Url']}\r\n"
+      response = @app.call(env, @thread_pool)
+      response_str, alive = @parser.concat_response(response)
+      client << response_str
       client.alive = true if alive
       @responses.push client
     end
