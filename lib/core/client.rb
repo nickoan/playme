@@ -5,17 +5,18 @@ module PlayMe
 
   class Client
 
+
+    attr_reader :ip
     def initialize(io, time = 10, log = nil)
       @io = io
+      @remote_info = io.peeraddr
+      @ip = @remote_info.last
       @to_io = io.to_io
       @log = log
       @requests = []
       @responses = []
-
       @alive = false
-
       @timeout = Time.now.to_i + time
-
       @buffer = nil
     end
 

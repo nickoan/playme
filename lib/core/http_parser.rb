@@ -1,7 +1,6 @@
 
 module PlayMe
   class Parser
-
     def initialize
       @@header_reg = /(.*?):\s(.*)/
       @@post_body = /(.*?)=\s?(.*)/
@@ -37,6 +36,19 @@ module PlayMe
       hash[:body] = body
 
       return hash
+    end
+
+
+    def concat_response(response)
+
+      state_desc = HttpStatusCode[response[0]]
+      str = "HTTP/1.1 #{response[0]} #{state_desc}\r\n"
+      response[1].each do |k, v|
+        str << "#{k}: #{v}\r\n"
+      end
+      str << response[2].to_s
+      return [str, true] if response[1]['Connection'] == 'Keep-Alive'
+      [str, false]
     end
 
     private
