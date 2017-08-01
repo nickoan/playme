@@ -20,12 +20,11 @@ app = proc do |request|
 end
 
 # in here server will fork 3 processes to listen your http request
-server = PlayMe::Base.new(app, works:3)
-
 # if you run it on windows or you do not prefer run in multiprocess, then you able 
 # remove works config just like this:
 # example: 
 # server = PlayMe::Base.new(app)
 
+server = PlayMe::Base.new(app, works:3)
 server.run!
 ```
