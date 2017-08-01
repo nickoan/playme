@@ -1,7 +1,6 @@
 require 'rb_thread_pool'
 require 'core/http_parser'
 require 'core/client'
-require 'benchmark'
 
 module PlayMe
   class Reactor
@@ -18,7 +17,7 @@ module PlayMe
       @writing = []
       @living = []
 
-      @thread_pool = RBThreadPool::Base.new(config)
+      #@thread_pool = RBThreadPool::Base.new(config)
       @reactor = nil
 
       @parser = Parser.new
@@ -35,7 +34,7 @@ module PlayMe
       @reactor = Thread.new do
         Thread.abort_on_exception = true
         Thread.current.name = "PlayMe:Reactor #{Thread.current.to_s}" if Thread.respond_to?(:name=)
-        @thread_pool.start!
+        #@thread_pool.start!
         reactor_run_in_th
       end
     end
@@ -175,6 +174,7 @@ module PlayMe
       $stdout.write "#{env['Method']} #{client.ip}[#{Time.now.to_s}]: #{env['Url']}\r\n"
       response = @app.call(env, @thread_pool)
       response_str, alive = @parser.concat_response(response)
+      p response_str
       client << response_str
       client.alive = true if alive
       @responses.push client
