@@ -1,4 +1,7 @@
 
+require 'core/http_status_code'
+
+
 module PlayMe
   class Parser
     def initialize
@@ -42,11 +45,11 @@ module PlayMe
     def concat_response(response)
 
       state_desc = HttpStatusCode[response[0]]
-      str = "HTTP/1.1 #{response[0]} #{state_desc}\r\n"
+      str = "HTTP/1.1 #{response[0]} #{state_desc}#{@@eds}"
       response[1].each do |k, v|
-        str << "#{k}: #{v}\r\n"
+        str << "#{k}: #{v}#{@@eds}"
       end
-      str << response[2].to_s
+      str << @@eds << response[2].to_s << @@eds
       return [str, true] if response[1]['Connection'] == 'Keep-Alive'
       [str, false]
     end
