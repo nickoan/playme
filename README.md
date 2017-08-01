@@ -1,7 +1,9 @@
 # playme
-a simple ruby tcp server with reactor and thread pool
+a ruby reactor tcp server with multiprocess, able run on windows
 
-still in design, not finish yet!
+currently not support with rack..
+
+still in design...!
 
 basic sample :
 
