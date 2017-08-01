@@ -7,16 +7,27 @@ basic sample :
 
 ```ruby
   
+require './playme'
+
+require 'net/http'
+
 app = proc do |request|
   if request['Url'] == '/'
-    str = 'this is me'
-    [200, {'Content-Type' => 'text/html;charset=utf-8'}, str]
+    # uri = URI("https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=APPID&secret=APPSECRET")
+    # str = Net::HTTP.get(uri)
+    [200, {'Content-Type' => 'text/plain'}, '123']
   else
-    [500, {'Content-Type' => 'text/html;charset=utf-8'}, 'hello world']
+    [200, {'Content-Type' => 'text/html'}, 'hello world']
   end
-
 end
 
-server = PlayMe::Base.new(app)
+# in here server will fork 3 processes to listen your http request
+server = PlayMe::Base.new(app, works:3)
+
+# if you run it on windows or you do not prefer run in multiprocess, then you able 
+# remove works config just like this:
+# example: 
+# server = PlayMe::Base.new(app)
+
 server.run!
 ```
