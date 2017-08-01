@@ -7,12 +7,16 @@ basic sample :
 
 ```ruby
   
-  require 'core/base'
-
-  app = proc do |request|
-    "HTTP/1.1 200 OK\r\n\r\nHello\r\n"
+app = proc do |request|
+  if request['Url'] == '/'
+    str = 'this is me'
+    [200, {'Content-Type' => 'text/html;charset=utf-8'}, str]
+  else
+    [500, {'Content-Type' => 'text/html;charset=utf-8'}, 'hello world']
   end
 
-  server = PlayMe::Base.new(app)
-  server.run!
+end
+
+server = PlayMe::Base.new(app)
+server.run!
 ```
