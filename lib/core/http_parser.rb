@@ -49,8 +49,9 @@ module PlayMe
       response[1].each do |k, v|
         str << "#{k}: #{v}#{@@eds}"
       end
-      str << @@eds << response[2].to_s << @@eds
-      return [str, true] if response[1]['Connection'] == 'Keep-Alive'
+      body = response[2].to_s << @@eds
+      str << @@eds << body
+      #return [str, true] if response[1]['Connection'] == 'keep-alive'
       [str, false]
     end
 
