@@ -9,7 +9,6 @@ basic sample :
 
 ```ruby
 require './playme'
-require 'net/http'
 
 app = proc do |request|
   if request['Url'] == '/'
