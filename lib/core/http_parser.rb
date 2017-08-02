@@ -35,7 +35,7 @@ module PlayMe
         end
       end
       request_arr.compact!
-      hash[:body] = request_arr.join
+      hash['body'] = request_arr.join
       # hash[:body] = body
       return hash
     end
