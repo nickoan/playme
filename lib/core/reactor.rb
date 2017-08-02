@@ -174,7 +174,6 @@ module PlayMe
       $stdout.write "#{env['Method']} #{client.ip}[#{Time.now.to_s}]: #{env['Url']}\r\n"
       response = @app.call(env, @thread_pool)
       response_str, alive = @parser.concat_response(response)
-      p response_str
       client << response_str
       client.alive = true if alive
       @responses.push client
