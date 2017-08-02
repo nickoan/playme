@@ -35,12 +35,8 @@ module PlayMe
         end
       end
       request_arr.compact!
-      #body = request_arr[0]
-      body = ''
-      request_arr.each do |val|
-        body << val << @@eds
-      end
-      hash[:body] = body
+      hash[:body] = request_arr.join
+      # hash[:body] = body
       return hash
     end
 
