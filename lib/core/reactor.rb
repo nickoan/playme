@@ -15,7 +15,7 @@ module PlayMe
 
       @pending = []
       @writing = []
-      @living = []
+      #@living = []
 
       #@thread_pool = RBThreadPool::Base.new(config)
       @reactor = nil
@@ -53,7 +53,7 @@ module PlayMe
         #
         op_pending_client
         #
-        op_living_client
+        # op_living_client
         #
         op_writing_client
         #
@@ -63,42 +63,40 @@ module PlayMe
 
     private
 
-    def op_living_client
-      return if @living.empty?
-      @living.size.times do |idx|
-        client = @living[idx]
-        if client.timeout?
-          close_client client
-          @living[idx] = nil
-          next
-        end
-
-        if client.try_read
-          run_in_pool(client)
-          @living[idx] = nil
-        end
-      end
-      @living.compact!
-    end
-
 
     def op_writing_client
       return if @writing.empty?
-      size = @writing.size
-      size.times do |idx|
-        client = @writing[idx]
 
+      @writing = @writing.select do |client|
         if client.timeout?
           close_client client
-          @writing[idx] = nil
           next
         end
 
         if client.try_write
-          @writing[idx] = nil
+          if client.alive?
+            @pending << client
+            next
+          end
+          close_client client
+          next
         end
       end
-      @writing.compact!
+      # size = @writing.size
+      # size.times do |idx|
+      #   client = @writing[idx]
+      #
+      #   if client.timeout?
+      #     close_client client
+      #     @writing[idx] = nil
+      #     next
+      #   end
+      #
+      #   if client.try_write
+      #     @writing[idx] = nil
+      #   end
+      # end
+      # @writing.compact!
     end
 
     def op_response_client
