@@ -22,6 +22,7 @@ module PlayMe
 
       @parser = Parser.new
 
+      @backend_ths = BackendThreads.new
       # when all queue and array empty it will turn false
       # which mean will block reactor
       @condition = false
@@ -58,6 +59,8 @@ module PlayMe
         op_writing_client
         #
         op_response_client
+
+        Thread.pass # notify schedule checking other threads
       end
     end
 
@@ -66,13 +69,7 @@ module PlayMe
 
     def op_writing_client
       return if @writing.empty?
-
       @writing = @writing.select do |client|
-        if client.timeout?
-          close_client client
-          next
-        end
-
         if client.try_write
           if client.alive?
             @pending << client
@@ -81,22 +78,13 @@ module PlayMe
           close_client client
           next
         end
+
+        if client.timeout?
+          close_client client
+          next
+        end
+        true
       end
-      # size = @writing.size
-      # size.times do |idx|
-      #   client = @writing[idx]
-      #
-      #   if client.timeout?
-      #     close_client client
-      #     @writing[idx] = nil
-      #     next
-      #   end
-      #
-      #   if client.try_write
-      #     @writing[idx] = nil
-      #   end
-      # end
-      # @writing.compact!
     end
 
     def op_response_client
@@ -119,24 +107,38 @@ module PlayMe
 
     def op_pending_client
       return if @pending.empty?
-      size = @pending.size
 
-      size.times do |idx|
-        client = @pending[idx]
-
+      @pending = @pending.select do |client|
         if client.timeout?
-          close_client client
-          @pending[idx] = nil
+          close_client(client)
           next
         end
 
         if client.try_read
-          run_in_pool client
-          @pending[idx] = nil
+          run_in_pool(client)
+          next
         end
-      end
 
-      @pending.compact!
+        true
+      end
+      # size = @pending.size
+      #
+      # size.times do |idx|
+      #   client = @pending[idx]
+      #
+      #   if client.timeout?
+      #     close_client client
+      #     @pending[idx] = nil
+      #     next
+      #   end
+      #
+      #   if client.try_read
+      #     run_in_pool client
+      #     @pending[idx] = nil
+      #   end
+      # end
+      #
+      # @pending.compact!
     end
 
     def op_register_client
@@ -166,9 +168,16 @@ module PlayMe
       signal_min_client
     end
 
+    def generate_proc(env, client)
+      proc { @app.call(env, client) }
+    end
+
     def run_in_pool(client)
       request = client.request
       env = @parser.execute request
+
+      @backend_ths.pop
+
       $stdout.write "#{env['Method']} #{client.ip}[#{Time.now.to_s}]: #{env['Url']}\r\n"
       response = @app.call(env, @thread_pool)
       response_str, alive = @parser.concat_response(response)
